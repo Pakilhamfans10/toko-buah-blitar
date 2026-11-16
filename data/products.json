@@ -1,0 +1,14 @@
+[
+  { "id": 1,  "nama": "Jeruk Manis",        "emoji": "🍊", "kategori": "Jeruk & Apel", "harga": 22000, "satuan": "kg",   "stok": 40, "warna": "#FFE0B2", "deskripsi": "Jeruk manis berair, cocok untuk dimakan langsung atau dibuat jus." },
+  { "id": 2,  "nama": "Apel Fuji",          "emoji": "🍎", "kategori": "Jeruk & Apel", "harga": 38000, "satuan": "kg",   "stok": 25, "warna": "#FFCDD2", "deskripsi": "Apel renyah dengan rasa manis, dipilih satu per satu." },
+  { "id": 3,  "nama": "Pisang Raja",        "emoji": "🍌", "kategori": "Tropis",       "harga": 25000, "satuan": "kg",   "stok": 30, "warna": "#FFF9C4", "deskripsi": "Pisang matang pohon, legit dan lembut." },
+  { "id": 4,  "nama": "Mangga Harum Manis", "emoji": "🥭", "kategori": "Tropis",       "harga": 28000, "satuan": "kg",   "stok": 20, "warna": "#FFE082", "deskripsi": "Mangga beraroma harum dengan daging buah tebal." },
+  { "id": 5,  "nama": "Semangka Merah",     "emoji": "🍉", "kategori": "Berair",       "harga": 12000, "satuan": "kg",   "stok": 50, "warna": "#C8E6C9", "deskripsi": "Semangka merah segar, juara untuk cuaca panas." },
+  { "id": 6,  "nama": "Melon Hijau",        "emoji": "🍈", "kategori": "Berair",       "harga": 18000, "satuan": "kg",   "stok": 35, "warna": "#DCEDC8", "deskripsi": "Melon hijau manis dengan tekstur lembut." },
+  { "id": 7,  "nama": "Anggur Hijau",       "emoji": "🍇", "kategori": "Berair",       "harga": 65000, "satuan": "kg",   "stok": 0,  "warna": "#E1BEE7", "deskripsi": "Anggur tanpa biji, manis segar. Sedang menunggu kiriman baru." },
+  { "id": 8,  "nama": "Nanas Madu",         "emoji": "🍍", "kategori": "Tropis",       "harga": 15000, "satuan": "buah", "stok": 28, "warna": "#FFF59D", "deskripsi": "Nanas manis asam yang segar, sudah matang sempurna." },
+  { "id": 9,  "nama": "Pir Packham",        "emoji": "🍐", "kategori": "Jeruk & Apel", "harga": 32000, "satuan": "kg",   "stok": 18, "warna": "#F0F4C3", "deskripsi": "Pir berair dengan rasa manis yang ringan." },
+  { "id": 10, "nama": "Kelapa Muda",        "emoji": "🥥", "kategori": "Tropis",       "harga": 10000, "satuan": "butir","stok": 45, "warna": "#D7CCC8", "deskripsi": "Kelapa muda dengan air segar dan daging lembut." },
+  { "id": 11, "nama": "Belimbing Manis",    "emoji": "⭐", "kategori": "Tropis",       "harga": 20000, "satuan": "kg",   "stok": 22, "warna": "#F9FBE7", "deskripsi": "Belimbing renyah berbentuk bintang, segar dan berair." },
+  { "id": 12, "nama": "Lemon",              "emoji": "🍋", "kategori": "Jeruk & Apel", "harga": 30000, "satuan": "kg",   "stok": 15, "warna": "#FFF176", "deskripsi": "Lemon segar untuk minuman dan masakan." }
+]
