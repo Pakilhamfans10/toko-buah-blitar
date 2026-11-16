@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Toko Buah Segar Blitar: buah segar pilihan, pesan online dan ambil di toko atau diantar di sekitar Blitar.">
+  <meta name="theme-color" content="#2E7D32">
+  <title>Toko Buah Segar Blitar</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#produk">Lewati ke produk</a>
+
+  <!-- ===== HEADER / NAVBAR ===== -->
+  <header class="site-header" id="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="#beranda">
+        <img src="assets/logo.svg" alt="" width="40" height="40">
+        <span>Buah Segar <strong>Blitar</strong></span>
+      </a>
+
+      <nav class="main-nav" id="main-nav" aria-label="Navigasi utama">
+        <a href="#beranda">Beranda</a>
+        <a href="#produk">Produk</a>
+        <a href="#tentang">Tentang</a>
+        <a href="#kontak">Kontak</a>
+      </nav>
+
+      <div class="header-actions">
+        <button type="button" class="btn btn-ghost" id="btn-login">Masuk</button>
+        <div class="user-box hidden" id="user-box">
+          <span class="user-name" id="user-name"></span>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-logout">Keluar</button>
+        </div>
+        <button type="button" class="cart-btn" id="btn-cart" aria-label="Buka keranjang belanja">
+          <span aria-hidden="true">🛒</span>
+          <span class="cart-badge" id="cart-badge">0</span>
+        </button>
+        <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Buka menu" aria-expanded="false" aria-controls="main-nav">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ===== HERO SLIDER ===== -->
+    <section class="hero" id="beranda" aria-label="Promo dan sambutan" aria-roledescription="carousel">
+      <div class="slide slide-1" style="display:block">
+        <div class="container slide-inner">
+          <div class="slide-text">
+            <p class="eyebrow">Toko Buah di Blitar</p>
+            <h1>Buah segar pilihan, langsung ke meja Anda</h1>
+            <p>Dipilih setiap pagi, dijual dengan harga jujur. Pesan online, ambil di toko atau kami antar.</p>
+            <a class="btn btn-light" href="#produk">Lihat Produk</a>
+          </div>
+          <div class="slide-art" aria-hidden="true">🍊🍎🍌</div>
+        </div>
+      </div>
+      <div class="slide slide-2">
+        <div class="container slide-inner">
+          <div class="slide-text">
+            <p class="eyebrow">Favorit Musim Ini</p>
+            <h2>Semangka, melon, dan mangga yang manis</h2>
+            <p>Cocok untuk cuaca panas Blitar. Stok terbatas, pesan sebelum kehabisan.</p>
+            <a class="btn btn-light" href="#produk">Pesan Sekarang</a>
+          </div>
+          <div class="slide-art" aria-hidden="true">🍉🍈🥭</div>
+        </div>
+      </div>
+      <div class="slide slide-3">
+        <div class="container slide-inner">
+          <div class="slide-text">
+            <p class="eyebrow">Mudah &amp; Praktis</p>
+            <h2>Pilih, masukkan keranjang, selesai</h2>
+            <p>Masuk dengan akun demo, tambahkan buah ke keranjang, lalu isi data pemesan.</p>
+            <a class="btn btn-light" href="#kontak">Cara Pesan</a>
+          </div>
+          <div class="slide-art" aria-hidden="true">🛒🍇🍍</div>
+        </div>
+      </div>
+
+      <button type="button" class="slider-arrow slider-prev" id="slider-prev" aria-label="Slide sebelumnya">&#10094;</button>
+      <button type="button" class="slider-arrow slider-next" id="slider-next" aria-label="Slide berikutnya">&#10095;</button>
+      <div class="slider-dots" id="slider-dots"></div>
+    </section>
+
+    <!-- ===== PRODUK ===== -->
+    <section class="section" id="produk">
+      <div class="container">
+        <div class="section-head">
+          <h2>Produk Kami</h2>
+          <p>Cari, saring, dan urutkan buah favorit Anda.</p>
+        </div>
+
+        <div class="toolbar">
+          <div class="field search-field">
+            <label for="search">Cari buah</label>
+            <input type="search" id="search" placeholder="Contoh: mangga" autocomplete="off">
+          </div>
+          <div class="field sort-field">
+            <label for="sort">Urutkan</label>
+            <select id="sort">
+              <option value="default">Bawaan</option>
+              <option value="harga-asc">Harga: termurah</option>
+              <option value="harga-desc">Harga: termahal</option>
+              <option value="nama">Nama: A ke Z</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="chips" id="filter-kategori" role="group" aria-label="Filter kategori"></div>
+        <p class="result-info" id="result-info" aria-live="polite"></p>
+
+        <div class="product-grid" id="product-grid">
+          <p class="state-msg" id="loading-msg">Memuat produk…</p>
+        </div>
+        <p class="state-msg hidden" id="empty-msg">Tidak ada buah yang cocok dengan pencarian Anda.</p>
+        <p class="state-msg state-error hidden" id="error-msg" role="alert"></p>
+      </div>
+    </section>
+
+    <!-- ===== TENTANG ===== -->
+    <section class="section section-alt" id="tentang">
+      <div class="container">
+        <div class="section-head">
+          <h2>Kenapa Belanja di Sini?</h2>
+          <p>Toko buah keluarga di Blitar, Jawa Timur, yang mengutamakan kesegaran.</p>
+        </div>
+        <div class="features">
+          <article class="feature">
+            <div class="feature-icon" aria-hidden="true">🌿</div>
+            <h3>Segar Setiap Hari</h3>
+            <p>Buah dipilih dan ditata setiap pagi, yang kurang segar tidak kami jual.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon" aria-hidden="true">💰</div>
+            <h3>Harga Jujur</h3>
+            <p>Harga tertera jelas per kilogram atau per buah, tanpa biaya tersembunyi.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon" aria-hidden="true">🛵</div>
+            <h3>Ambil atau Antar</h3>
+            <p>Ambil sendiri di toko atau minta diantar ke alamat di sekitar Blitar.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== KONTAK ===== -->
+    <section class="section" id="kontak">
+      <div class="container">
+        <div class="section-head">
+          <h2>Kontak &amp; Cara Pesan</h2>
+          <p>Pesan lewat keranjang di situs ini, atau hubungi kami langsung.</p>
+        </div>
+        <div class="contact-grid">
+          <div class="contact-card">
+            <h3>Informasi Toko</h3>
+            <ul class="contact-list">
+              <li><strong>Alamat:</strong> Jl. Contoh No. 1, Kota Blitar, Jawa Timur</li>
+              <li><strong>WhatsApp:</strong> 08xx-xxxx-xxxx</li>
+              <li><strong>Jam buka:</strong> Setiap hari, 06.00 – 17.00 WIB</li>
+            </ul>
+          </div>
+          <div class="contact-card">
+            <h3>Cara Memesan</h3>
+            <ol class="steps">
+              <li>Klik <em>Masuk</em> dan gunakan akun demo.</li>
+              <li>Tambahkan buah ke keranjang.</li>
+              <li>Buka keranjang, isi data pemesan, lalu kirim pesanan.</li>
+            </ol>
+            <p class="demo-note">Akun demo: <code>pembeli</code> / <code>buah123</code>. Situs ini hanya demo tugas, pesanan tidak dikirim ke server.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; <span id="year">2026</span> Toko Buah Segar Blitar. Tugas Akhir Workshop Desain Web, Politeknik Elektronika Negeri Surabaya.</p>
+    </div>
+  </footer>
+
+  <!-- ===== KERANJANG (DRAWER) ===== -->
+  <div class="overlay" id="overlay"></div>
+  <aside class="drawer" id="cart-drawer" aria-hidden="true" aria-labelledby="cart-title" role="dialog" aria-modal="true">
+    <div class="drawer-head">
+      <h2 id="cart-title">Keranjang Belanja</h2>
+      <button type="button" class="icon-btn" id="cart-close" aria-label="Tutup keranjang">&times;</button>
+    </div>
+
+    <div class="drawer-body">
+      <div id="cart-view">
+        <p class="state-msg" id="cart-empty">Keranjang masih kosong. Yuk pilih buah dulu.</p>
+        <ul class="cart-list" id="cart-items"></ul>
+        <div class="cart-total" id="cart-total-row">
+          <span>Total</span>
+          <strong id="cart-total">Rp 0</strong>
+        </div>
+
+        <form class="order-form" id="order-form" novalidate>
+          <h3>Data Pemesan</h3>
+          <p class="login-note hidden" id="login-note">Silakan <button type="button" class="link-btn" id="note-login">masuk</button> terlebih dahulu untuk memesan.</p>
+
+          <div class="form-group">
+            <label for="order-nama">Nama lengkap</label>
+            <input type="text" id="order-nama" name="nama" autocomplete="name" maxlength="60">
+            <div class="field-err" id="err-nama" role="alert"></div>
+          </div>
+          <div class="form-group">
+            <label for="order-hp">Nomor HP / WhatsApp</label>
+            <input type="tel" id="order-hp" name="hp" inputmode="tel" placeholder="08xxxxxxxxxx" autocomplete="tel" maxlength="16">
+            <div class="field-err" id="err-hp" role="alert"></div>
+          </div>
+          <fieldset class="form-group metode">
+            <legend>Cara terima pesanan</legend>
+            <label class="radio"><input type="radio" name="metode" value="ambil" checked> Ambil di toko</label>
+            <label class="radio"><input type="radio" name="metode" value="antar"> Diantar</label>
+          </fieldset>
+          <div class="form-group" id="alamat-group" style="display:none">
+            <label for="order-alamat">Alamat pengantaran</label>
+            <textarea id="order-alamat" name="alamat" rows="3" maxlength="200" autocomplete="street-address"></textarea>
+            <div class="field-err" id="err-alamat" role="alert"></div>
+          </div>
+          <div class="form-group">
+            <label for="order-catatan">Catatan (opsional)</label>
+            <textarea id="order-catatan" name="catatan" rows="2" maxlength="200" placeholder="Contoh: pilih yang agak mengkal"></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="order-submit">Kirim Pesanan</button>
+        </form>
+      </div>
+
+      <div id="order-success" class="order-success" style="display:none" tabindex="-1">
+        <div class="success-icon" aria-hidden="true">✅</div>
+        <h3>Pesanan diterima!</h3>
+        <p class="success-code">Kode pesanan: <strong id="success-code"></strong></p>
+        <dl class="success-detail" id="success-detail"></dl>
+        <ul class="success-items" id="success-items"></ul>
+        <p class="success-total">Total: <strong id="success-total"></strong></p>
+        <p class="demo-note">Ini hanya demo tugas, pesanan tidak dikirim ke server.</p>
+        <button type="button" class="btn btn-primary btn-block" id="success-close">Belanja Lagi</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== MODAL LOGIN ===== -->
+  <div class="modal" id="login-modal" aria-hidden="true">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="login-title">
+      <button type="button" class="icon-btn modal-close" id="login-close" aria-label="Tutup">&times;</button>
+      <h2 id="login-title">Masuk</h2>
+      <form id="login-form" novalidate>
+        <div class="form-group">
+          <label for="login-user">Username</label>
+          <input type="text" id="login-user" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="login-pass">Password</label>
+          <input type="password" id="login-pass" autocomplete="current-password">
+        </div>
+        <div class="field-err" id="login-err" role="alert"></div>
+        <button type="submit" class="btn btn-primary btn-block">Masuk</button>
+      </form>
+      <p class="demo-note">Akun demo: <code>pembeli</code> / <code>buah123</code></p>
+    </div>
+  </div>
+
+  <div class="toast-wrap" id="toast-wrap" aria-live="polite"></div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+  <script src="app.js"></script>
+</body>
+</html>
