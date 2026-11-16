@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Logo Toko Buah Segar Blitar">
+  <circle cx="32" cy="36" r="22" fill="#E65100"/>
+  <circle cx="24" cy="28" r="6" fill="#FF8A50" opacity=".6"/>
+  <path d="M32 14c0-6 4-10 10-10 0 6-4 10-10 10z" fill="#2E7D32"/>
+  <rect x="31" y="11" width="3" height="9" rx="1.5" fill="#1B5E20"/>
+</svg>
