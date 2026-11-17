@@ -90,7 +90,7 @@ code { background: #EFEBE0; padding: 1px 6px; border-radius: 4px; font-size: .92
 /* ---------- Header (Flexbox) ---------- */
 .site-header {
   position: sticky; top: 0; z-index: 30;
-  background: rgba(255, 255, 255, .96); backdrop-filter: blur(6px);
+  background: rgba(255, 255, 255, .97);   /* tanpa backdrop-filter: blur mahal saat scroll di HP */
   border-bottom: 1px solid var(--garis);
 }
 .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: var(--header-h); }
@@ -176,20 +176,21 @@ input.invalid, textarea.invalid { border-color: var(--merah); }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .chip {
   font: inherit; font-weight: 600; cursor: pointer; background: #fff; color: var(--teks);
-  border: 2px solid var(--garis); border-radius: 999px; padding: 6px 16px; transition: all .2s;
+  border: 2px solid var(--garis); border-radius: 999px; padding: 6px 16px;
+  transition: background-color .2s, border-color .2s, color .2s;
 }
 .chip:hover { border-color: var(--hijau); }
 .chip.active { background: var(--hijau); border-color: var(--hijau); color: #fff; }
 .result-info { color: var(--abu); font-size: .92rem; margin-bottom: 16px; min-height: 1.5em; }
 
 /* ---------- Grid produk (CSS Grid) ---------- */
-.product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px; }
+.product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px; min-height: 360px; }   /* cadangan tinggi agar halaman tidak melompat saat produk dimuat */
 .card {
   display: flex; flex-direction: column; background: #fff; border: 1px solid var(--garis);
   border-radius: var(--radius); overflow: hidden; box-shadow: var(--bayangan);
   transition: transform .2s, box-shadow .2s;
-  animation: fadeUp .4s backwards;
 }
+.card.enter { animation: fadeUp .4s backwards; }   /* hanya saat katalog pertama tampil */
 .card:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(38, 50, 56, .16); }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .card-img { display: flex; align-items: center; justify-content: center; height: 130px; font-size: 4rem; }
@@ -240,7 +241,7 @@ input.invalid, textarea.invalid { border-color: var(--merah); }
 .drawer.open { transform: none; visibility: visible; transition: transform .3s; }
 .drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--garis); }
 .drawer-head h2 { margin: 0; font-size: 1.25rem; color: var(--hijau-tua); }
-.drawer-body { flex: 1; overflow-y: auto; padding: 16px; }
+.drawer-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 16px; }
 
 .cart-list { list-style: none; padding: 0; margin: 0 0 12px; }
 .cart-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--garis); }

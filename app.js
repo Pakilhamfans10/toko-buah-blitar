@@ -3,24 +3,48 @@
    Fitur: render produk dari JSON, cari/filter/urut, keranjang
    (event delegation), slider animasi, login dari users.json,
    validasi form pemesanan.
+
+   Catatan optimasi:
+   - Kartu produk & item keranjang dibuat sebagai string HTML lalu
+     ditulis ke DOM sekali (bukan puluhan elemen jQuery satu per satu).
+   - Selector jQuery di-cache; produk dicari lewat peta id (O(1)).
+   - users.json hanya diunduh saat dibutuhkan (login), bukan saat awal.
+   - Slider berhenti saat tab disembunyikan / hero keluar layar.
    ========================================================= */
 (function ($) {
   'use strict';
 
   var KEY_CART = 'tbb_cart';
   var KEY_USER = 'tbb_user';
+  var HTML_ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  var DOM_IDS = [
+    'product-grid', 'empty-msg', 'error-msg', 'result-info', 'search', 'sort', 'filter-kategori',
+    'cart-items', 'cart-empty', 'cart-total-row', 'order-form', 'cart-total', 'cart-badge',
+    'btn-cart', 'cart-close', 'cart-drawer', 'cart-view', 'overlay', 'order-success',
+    'login-modal', 'login-form', 'login-user', 'login-pass', 'login-err', 'login-note',
+    'btn-login', 'user-box', 'user-name', 'alamat-group', 'toast-wrap', 'site-header', 'nav-toggle',
+    'success-items', 'success-detail', 'success-code', 'success-total', 'order-catatan'
+  ];
 
   var products = [];
-  var users = [];
+  var byId = {};            // { idProduk: produk } supaya pencarian cepat
+  var usersReq = null;      // promise users.json (dimuat saat dibutuhkan)
   var cart = {};            // { idProduk: jumlah }
   var currentUser = null;   // { username, nama }
   var view = { q: '', kategori: 'semua', sort: 'default' };
   var lastFocus = null;
+  var firstRender = true;   // animasi muncul hanya pada render pertama
+  var $ui = {};             // cache objek jQuery (diisi saat DOM siap)
+  var $fields = {};         // { nama|hp|alamat: { $in, $err } }
 
   /* ---------- Utilitas ---------- */
 
   function trim(s) {
-    return String(s == null ? '' : s).replace(/^\s+|\s+$/g, '');
+    return String(s == null ? '' : s).trim();
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) { return HTML_ESC[c]; });
   }
 
   function rupiah(n) {
@@ -39,15 +63,20 @@
   }
 
   function findProduct(id) {
-    for (var i = 0; i < products.length; i++) {
-      if (products[i].id === id) { return products[i]; }
-    }
-    return null;
+    return byId[id] || null;
+  }
+
+  // Memutar ulang animasi CSS pada elemen yang sama.
+  function replayAnimation($el, cls) {
+    $el.removeClass(cls);
+    void $el[0].offsetWidth;
+    $el.addClass(cls);
   }
 
   function toast(message, isError) {
     var $t = $('<div class="toast" role="status">').text(message).toggleClass('error', !!isError);
-    $('#toast-wrap').append($t);
+    $ui.toastWrap.children().slice(0, -2).remove();   // paling banyak 3 toast sekaligus
+    $ui.toastWrap.append($t);
     $t.fadeIn(200).delay(2200).fadeOut(300, function () { $t.remove(); });
   }
 
@@ -58,6 +87,11 @@
       .done(function (data) {
         if (!Array.isArray(data) || !data.length) { return showLoadError(); }
         products = data;
+        byId = {};
+        $.each(products, function (_, p) {
+          byId[p.id] = p;
+          p.cari = (p.nama + ' ' + p.deskripsi).toLowerCase();   // dihitung sekali, dipakai tiap pencarian
+        });
         restoreCart();
         buildCategoryChips();
         renderProducts();
@@ -67,17 +101,22 @@
   }
 
   function showLoadError() {
-    $('#loading-msg').remove();
-    $('#result-info').text('');
-    $('#error-msg')
+    $ui.productGrid.empty();
+    $ui.resultInfo.text('');
+    $ui.errorMsg
       .text('Gagal memuat data produk. Jika Anda membuka file langsung, jalankan lewat Live Server atau GitHub Pages.')
       .removeClass('hidden');
   }
 
-  function loadUsers() {
-    $.getJSON('data/users.json')
-      .done(function (data) { users = Array.isArray(data) ? data : []; })
-      .fail(function () { users = []; });
+  // users.json hanya diunduh saat pertama kali dibutuhkan; kalau gagal boleh dicoba lagi.
+  function getUsers() {
+    if (!usersReq) {
+      usersReq = $.getJSON('data/users.json').then(
+        function (data) { return Array.isArray(data) ? data : []; },
+        function () { usersReq = null; return []; }
+      );
+    }
+    return usersReq;
   }
 
   /* ---------- Produk: filter, urut, render ---------- */
@@ -87,23 +126,20 @@
     $.each(products, function (_, p) {
       if ($.inArray(p.kategori, cats) === -1) { cats.push(p.kategori); }
     });
-    var $wrap = $('#filter-kategori').empty();
+    var html = '';
     $.each(cats, function (_, c) {
-      $('<button type="button" class="chip">')
-        .attr('data-kategori', c)
-        .attr('aria-pressed', c === view.kategori ? 'true' : 'false')
-        .toggleClass('active', c === view.kategori)
-        .text(c === 'semua' ? 'Semua' : c)
-        .appendTo($wrap);
+      var on = c === view.kategori;
+      html += '<button type="button" class="chip' + (on ? ' active' : '') + '" data-kategori="' + esc(c) +
+        '" aria-pressed="' + on + '">' + (c === 'semua' ? 'Semua' : esc(c)) + '</button>';
     });
+    $ui.filterKategori.html(html);
   }
 
   function visibleProducts() {
     var q = trim(view.q).toLowerCase();
     var list = $.grep(products, function (p) {
       var okKategori = view.kategori === 'semua' || p.kategori === view.kategori;
-      var okCari = !q || (p.nama + ' ' + p.deskripsi).toLowerCase().indexOf(q) !== -1;
-      return okKategori && okCari;
+      return okKategori && (!q || p.cari.indexOf(q) !== -1);
     });
     if (view.sort === 'harga-asc') { list.sort(function (a, b) { return a.harga - b.harga; }); }
     else if (view.sort === 'harga-desc') { list.sort(function (a, b) { return b.harga - a.harga; }); }
@@ -112,36 +148,30 @@
   }
 
   function buildCard(p, index) {
-    var $card = $('<article class="card">').css('animation-delay', Math.min(index, 8) * 40 + 'ms');
-    $('<div class="card-img" aria-hidden="true">').css('background-color', p.warna).text(p.emoji).appendTo($card);
-
-    var $body = $('<div class="card-body">').appendTo($card);
-    $('<span class="tag">').text(p.kategori).appendTo($body);
-    $('<h3>').text(p.nama).appendTo($body);
-    $('<p class="card-desc">').text(p.deskripsi).appendTo($body);
-
-    var $price = $('<p class="price">').text(rupiah(p.harga) + ' ').appendTo($body);
-    $('<small>').text('/ ' + p.satuan).appendTo($price);
-
     var habis = p.stok <= 0;
-    $('<p class="stock">').toggleClass('out', habis)
-      .text(habis ? 'Stok habis' : 'Stok: ' + p.stok + ' ' + p.satuan).appendTo($body);
-
-    $('<button type="button" class="btn btn-accent btn-add">')
-      .attr('data-id', p.id)
-      .prop('disabled', habis)
-      .text(habis ? 'Stok Habis' : 'Tambah ke Keranjang')
-      .appendTo($body);
-    return $card;
+    var enter = firstRender ? ' enter" style="animation-delay:' + Math.min(index, 8) * 40 + 'ms' : '';
+    return '<article class="card' + enter + '">' +
+      '<div class="card-img" aria-hidden="true" style="background-color:' + esc(p.warna) + '">' + esc(p.emoji) + '</div>' +
+      '<div class="card-body">' +
+        '<span class="tag">' + esc(p.kategori) + '</span>' +
+        '<h3>' + esc(p.nama) + '</h3>' +
+        '<p class="card-desc">' + esc(p.deskripsi) + '</p>' +
+        '<p class="price">' + rupiah(p.harga) + ' <small>/ ' + esc(p.satuan) + '</small></p>' +
+        '<p class="stock' + (habis ? ' out' : '') + '">' +
+          (habis ? 'Stok habis' : 'Stok: ' + p.stok + ' ' + esc(p.satuan)) + '</p>' +
+        '<button type="button" class="btn btn-accent btn-add" data-id="' + p.id + '"' + (habis ? ' disabled' : '') + '>' +
+          (habis ? 'Stok Habis' : 'Tambah ke Keranjang') + '</button>' +
+      '</div></article>';
   }
 
   function renderProducts() {
-    $('#loading-msg').remove();
     var list = visibleProducts();
-    var $grid = $('#product-grid').empty();
-    $.each(list, function (i, p) { $grid.append(buildCard(p, i)); });
-    $('#empty-msg').toggleClass('hidden', list.length > 0);
-    $('#result-info').text('Menampilkan ' + list.length + ' dari ' + products.length + ' produk');
+    var html = '';
+    for (var i = 0; i < list.length; i++) { html += buildCard(list[i], i); }
+    $ui.productGrid.html(html);             // satu kali tulis ke DOM (sekaligus menghapus pesan "Memuat…")
+    firstRender = false;
+    $ui.emptyMsg.toggleClass('hidden', list.length > 0);
+    $ui.resultInfo.text('Menampilkan ' + list.length + ' dari ' + products.length + ' produk');
   }
 
   /* ---------- Keranjang ---------- */
@@ -160,19 +190,14 @@
 
   function saveCart() { writeStore('localStorage', KEY_CART, cart); }
 
-  function cartCount() {
-    var n = 0;
-    $.each(cart, function (_, q) { n += q; });
-    return n;
-  }
-
-  function cartTotal() {
-    var t = 0;
-    $.each(cart, function (id, q) {
-      var p = findProduct(Number(id));
-      if (p) { t += p.harga * q; }
+  // Jumlah barang dan total harga dihitung dalam satu putaran.
+  function cartStats() {
+    var count = 0, total = 0;
+    $.each(cart, function (id, qty) {
+      var p = findProduct(id);
+      if (p) { count += qty; total += p.harga * qty; }
     });
-    return t;
+    return { count: count, total: total };
   }
 
   function addToCart(id) {
@@ -186,9 +211,7 @@
     cart[id] = now + 1;
     saveCart();
     renderCart();
-    $('#btn-cart').removeClass('bump');
-    void $('#btn-cart')[0].offsetWidth;   // restart animasi
-    $('#btn-cart').addClass('bump');
+    replayAnimation($ui.btnCart, 'bump');
     toast(p.nama + ' ditambahkan ke keranjang');
   }
 
@@ -208,37 +231,44 @@
     renderCart();
   }
 
+  // Daftar keranjang digambar ulang seluruhnya, jadi fokus keyboard dikembalikan ke tombol yang sama.
+  function refocusCart(id, selector) {
+    var $btn = selector ? $ui.cartItems.children('[data-id="' + id + '"]').find(selector + ':enabled') : $();
+    if (!$btn.length) { $btn = $ui.cartItems.find('button:enabled').first(); }
+    if (!$btn.length) { $btn = $ui.cartClose; }
+    $btn.trigger('focus');
+  }
+
   function renderCart() {
-    var $list = $('#cart-items').empty();
-    var ids = $.map(cart, function (_, id) { return Number(id); });
+    var html = '', count = 0, total = 0;
 
-    $.each(ids, function (_, id) {
+    $.each(cart, function (id, qty) {
       var p = findProduct(id);
-      var qty = cart[id];
       if (!p) { return; }
-      var $li = $('<li class="cart-item">').attr('data-id', id);
-      $('<div class="cart-thumb" aria-hidden="true">').css('background-color', p.warna).text(p.emoji).appendTo($li);
-
-      var $info = $('<div class="cart-info">').appendTo($li);
-      $('<strong>').text(p.nama).appendTo($info);
-      $('<small>').text(rupiah(p.harga) + ' / ' + p.satuan).appendTo($info);
-      var $qty = $('<div class="qty">').appendTo($info);
-      $('<button type="button" class="qty-minus">').attr('aria-label', 'Kurangi ' + p.nama).text('−').appendTo($qty);
-      $('<span aria-live="polite">').text(qty).appendTo($qty);
-      $('<button type="button" class="qty-plus">').attr('aria-label', 'Tambah ' + p.nama).prop('disabled', qty >= p.stok).text('+').appendTo($qty);
-
-      var $sub = $('<div>').appendTo($li);
-      $('<div class="cart-sub">').text(rupiah(p.harga * qty)).appendTo($sub);
-      $('<button type="button" class="cart-remove">').attr('aria-label', 'Hapus ' + p.nama).text('Hapus').appendTo($sub);
-
-      $list.append($li);
+      count += qty;
+      total += p.harga * qty;
+      html += '<li class="cart-item" data-id="' + p.id + '">' +
+        '<div class="cart-thumb" aria-hidden="true" style="background-color:' + esc(p.warna) + '">' + esc(p.emoji) + '</div>' +
+        '<div class="cart-info">' +
+          '<strong>' + esc(p.nama) + '</strong>' +
+          '<small>' + rupiah(p.harga) + ' / ' + esc(p.satuan) + '</small>' +
+          '<div class="qty">' +
+            '<button type="button" class="qty-minus" aria-label="Kurangi ' + esc(p.nama) + '">−</button>' +
+            '<span aria-live="polite">' + qty + '</span>' +
+            '<button type="button" class="qty-plus" aria-label="Tambah ' + esc(p.nama) + '"' + (qty >= p.stok ? ' disabled' : '') + '>+</button>' +
+          '</div>' +
+        '</div>' +
+        '<div><div class="cart-sub">' + rupiah(p.harga * qty) + '</div>' +
+          '<button type="button" class="cart-remove" aria-label="Hapus ' + esc(p.nama) + '">Hapus</button></div>' +
+      '</li>';
     });
 
-    var empty = ids.length === 0;
-    $('#cart-empty').toggleClass('hidden', !empty);
-    $('#cart-total-row, #order-form').toggleClass('hidden', empty);
-    $('#cart-total').text(rupiah(cartTotal()));
-    $('#cart-badge').text(cartCount());
+    var empty = count === 0;
+    $ui.cartItems.html(html);
+    $ui.cartEmpty.toggleClass('hidden', !empty);
+    $ui.cartTotalRow.add($ui.orderForm).toggleClass('hidden', empty);
+    $ui.cartTotal.text(rupiah(total));
+    $ui.cartBadge.text(count);
     updateLoginNote();
   }
 
@@ -247,33 +277,34 @@
   function openDrawer() {
     lastFocus = document.activeElement;
     resetSuccessView();
-    $('#overlay').addClass('open');
-    $('#cart-drawer').addClass('open').attr('aria-hidden', 'false');
+    $ui.overlay.addClass('open');
+    $ui.cartDrawer.addClass('open').attr('aria-hidden', 'false');
     $('body').addClass('no-scroll');
-    $('#cart-close').trigger('focus');
+    $ui.cartClose.trigger('focus');
   }
 
   function closeDrawer() {
-    $('#overlay').removeClass('open');
-    $('#cart-drawer').removeClass('open').attr('aria-hidden', 'true');
+    $ui.overlay.removeClass('open');
+    $ui.cartDrawer.removeClass('open').attr('aria-hidden', 'true');
     $('body').removeClass('no-scroll');
     resetSuccessView();
     if (lastFocus && lastFocus.focus) { lastFocus.focus(); }
   }
 
-  function isDrawerOpen() { return $('#cart-drawer').hasClass('open'); }
-  function isModalOpen() { return $('#login-modal').hasClass('open'); }
+  function isDrawerOpen() { return $ui.cartDrawer.hasClass('open'); }
+  function isModalOpen() { return $ui.loginModal.hasClass('open'); }
 
   function openLogin() {
-    $('#login-err').hide().text('');
-    $('#login-form')[0].reset();
-    $('#login-modal').addClass('open').attr('aria-hidden', 'false');
+    getUsers();                              // mulai mengunduh users.json selagi pengguna mengetik
+    $ui.loginErr.hide().text('');
+    $ui.loginForm[0].reset();
+    $ui.loginModal.addClass('open').attr('aria-hidden', 'false');
     $('body').addClass('no-scroll');
-    window.setTimeout(function () { $('#login-user').trigger('focus'); }, 50);
+    window.setTimeout(function () { $ui.loginUser.trigger('focus'); }, 50);
   }
 
   function closeLogin() {
-    $('#login-modal').removeClass('open').attr('aria-hidden', 'true');
+    $ui.loginModal.removeClass('open').attr('aria-hidden', 'true');
     if (!isDrawerOpen()) { $('body').removeClass('no-scroll'); }
   }
 
@@ -282,10 +313,10 @@
   function setUser(user) {
     currentUser = user;
     writeStore('sessionStorage', KEY_USER, user ? { username: user.username, nama: user.nama } : null);
-    $('#btn-login').toggleClass('hidden', !!user);
-    $('#user-box').toggleClass('hidden', !user);
-    $('#user-name').text(user ? 'Halo, ' + user.nama : '');
-    if (user && !trim($('#order-nama').val())) { $('#order-nama').val(user.nama); }
+    $ui.btnLogin.toggleClass('hidden', !!user);
+    $ui.userBox.toggleClass('hidden', !user);
+    $ui.userName.text(user ? 'Halo, ' + user.nama : '');
+    if (user && !trim($fields.nama.$in.val())) { $fields.nama.$in.val(user.nama); }
     updateLoginNote();
   }
 
@@ -295,51 +326,49 @@
   }
 
   function updateLoginNote() {
-    $('#login-note').toggleClass('hidden', !!currentUser);
+    $ui.loginNote.toggleClass('hidden', !!currentUser);
   }
 
   function showLoginError(msg) {
-    var $box = $('#login-modal .modal-box');
-    $('#login-err').text(msg).stop(true, true).slideDown(150);
-    $box.removeClass('shake');
-    void $box[0].offsetWidth;
-    $box.addClass('shake');
+    $ui.loginErr.text(msg).stop(true, true).slideDown(150);
+    replayAnimation($ui.loginModal.find('.modal-box'), 'shake');
   }
 
   function onLoginSubmit(e) {
     e.preventDefault();
-    var u = trim($('#login-user').val()).toLowerCase();
-    var pw = $('#login-pass').val();
+    var u = trim($ui.loginUser.val()).toLowerCase();
+    var pw = $ui.loginPass.val();
     if (!u || !pw) { return showLoginError('Username dan password wajib diisi.'); }
-    if (!users.length) { return showLoginError('Data pengguna belum termuat. Coba muat ulang halaman.'); }
-    var match = $.grep(users, function (x) {
-      return String(x.username).toLowerCase() === u && x.password === pw;
-    })[0];
-    if (!match) { return showLoginError('Username atau password salah.'); }
-    setUser({ username: match.username, nama: match.nama });
-    closeLogin();
-    toast('Selamat datang, ' + match.nama + '!');
+    getUsers().then(function (users) {
+      if (!users.length) { return showLoginError('Data pengguna belum termuat. Coba muat ulang halaman.'); }
+      var match = $.grep(users, function (x) {
+        return String(x.username).toLowerCase() === u && x.password === pw;
+      })[0];
+      if (!match) { return showLoginError('Username atau password salah.'); }
+      setUser({ username: match.username, nama: match.nama });
+      closeLogin();
+      toast('Selamat datang, ' + match.nama + '!');
+    });
   }
 
   /* ---------- Form pemesanan: validasi ---------- */
 
   function setFieldError(field, msg) {
-    var $input = $('#order-' + field);
-    var $err = $('#err-' + field);
+    var f = $fields[field];
     if (msg) {
-      $input.addClass('invalid').attr('aria-invalid', 'true');
-      $err.text(msg).stop(true, true).slideDown(150);
+      f.$in.addClass('invalid').attr('aria-invalid', 'true');
+      f.$err.text(msg).stop(true, true).slideDown(150);
     } else {
-      $input.removeClass('invalid').removeAttr('aria-invalid');
-      $err.stop(true, true).hide().text('');
+      f.$in.removeClass('invalid').removeAttr('aria-invalid');
+      f.$err.stop(true, true).hide().text('');
     }
   }
 
   function validateOrder() {
-    var nama = trim($('#order-nama').val());
-    var hp = $('#order-hp').val().replace(/[\s-]/g, '');
+    var nama = trim($fields.nama.$in.val());
+    var hp = $fields.hp.$in.val().replace(/[\s-]/g, '');
     var metode = $('input[name="metode"]:checked').val();
-    var alamat = trim($('#order-alamat').val());
+    var alamat = trim($fields.alamat.$in.val());
     var errors = {};
 
     if (nama.length < 3) { errors.nama = 'Nama minimal 3 karakter.'; }
@@ -353,21 +382,22 @@
       else if (alamat.length < 10) { errors.alamat = 'Alamat terlalu singkat, tulis minimal 10 karakter.'; }
     }
 
-    $.each(['nama', 'hp', 'alamat'], function (_, f) { setFieldError(f, errors[f] || ''); });
+    var first = null;
+    $.each(['nama', 'hp', 'alamat'], function (_, f) {
+      setFieldError(f, errors[f] || '');
+      if (errors[f] && !first) { first = f; }
+    });
+    if (first) { $fields[first].$in.trigger('focus'); }
 
-    var order = ['nama', 'hp', 'alamat'];
-    for (var i = 0; i < order.length; i++) {
-      if (errors[order[i]]) { $('#order-' + order[i]).trigger('focus'); break; }
-    }
     return {
-      ok: $.isEmptyObject(errors),
-      data: { nama: nama, hp: hp, metode: metode, alamat: alamat, catatan: trim($('#order-catatan').val()) }
+      ok: !first,
+      data: { nama: nama, hp: hp, metode: metode, alamat: alamat, catatan: trim($ui.orderCatatan.val()) }
     };
   }
 
   function onOrderSubmit(e) {
     e.preventDefault();
-    if (!cartCount()) { return toast('Keranjang masih kosong.', true); }
+    if (!cartStats().count) { return toast('Keranjang masih kosong.', true); }
     if (!currentUser) {
       toast('Silakan masuk terlebih dahulu.', true);
       return openLogin();
@@ -377,70 +407,66 @@
     showSuccess(result.data);
   }
 
-  function addDetail($dl, label, value) {
-    $('<dt>').text(label).appendTo($dl);
-    $('<dd>').text(value).appendTo($dl);
-  }
-
   function showSuccess(d) {
-    var total = cartTotal();
-    var $items = $('#success-items').empty();
+    var total = cartStats().total;
+    var items = '';
     $.each(cart, function (id, qty) {
-      var p = findProduct(Number(id));
+      var p = findProduct(id);
       if (!p) { return; }
-      var $li = $('<li>').appendTo($items);
-      $('<span>').text(p.nama + ' × ' + qty + ' ' + p.satuan).appendTo($li);
-      $('<span>').text(rupiah(p.harga * qty)).appendTo($li);
+      items += '<li><span>' + esc(p.nama) + ' × ' + qty + ' ' + esc(p.satuan) + '</span><span>' + rupiah(p.harga * qty) + '</span></li>';
     });
+    $ui.successItems.html(items);
 
-    var $dl = $('#success-detail').empty();
-    addDetail($dl, 'Nama', d.nama);
-    addDetail($dl, 'No. HP', d.hp);
-    addDetail($dl, 'Penerimaan', d.metode === 'antar' ? 'Diantar' : 'Ambil di toko');
-    if (d.metode === 'antar') { addDetail($dl, 'Alamat', d.alamat); }
-    if (d.catatan) { addDetail($dl, 'Catatan', d.catatan); }
+    var detail = '';
+    function row(label, value) { detail += '<dt>' + label + '</dt><dd>' + esc(value) + '</dd>'; }
+    row('Nama', d.nama);
+    row('No. HP', d.hp);
+    row('Penerimaan', d.metode === 'antar' ? 'Diantar' : 'Ambil di toko');
+    if (d.metode === 'antar') { row('Alamat', d.alamat); }
+    if (d.catatan) { row('Catatan', d.catatan); }
+    $ui.successDetail.html(detail);
 
-    $('#success-code').text('TBB-' + Date.now().toString(36).toUpperCase());
-    $('#success-total').text(rupiah(total));
+    $ui.successCode.text('TBB-' + Date.now().toString(36).toUpperCase());
+    $ui.successTotal.text(rupiah(total));
 
     cart = {};
     saveCart();
     renderCart();
-    $('#order-form')[0].reset();
-    $('#alamat-group').hide();
+    $ui.orderForm[0].reset();
+    $ui.alamatGroup.hide();
     $.each(['nama', 'hp', 'alamat'], function (_, f) { setFieldError(f, ''); });
-    if (currentUser) { $('#order-nama').val(currentUser.nama); }
+    if (currentUser) { $fields.nama.$in.val(currentUser.nama); }
 
-    $('#cart-view').hide();
-    $('#order-success').fadeIn(250).trigger('focus');
+    $ui.cartView.hide();
+    $ui.orderSuccess.fadeIn(250).trigger('focus');
     $('.drawer-body').scrollTop(0);
   }
 
   function resetSuccessView() {
-    $('#order-success').hide();
-    $('#cart-view').show();
+    $ui.orderSuccess.hide();
+    $ui.cartView.show();
   }
 
   /* ---------- Slider hero (animasi fade jQuery) ---------- */
 
   function initSlider() {
-    var $slides = $('.hero .slide');
+    var $hero = $('.hero');
+    var $slides = $hero.find('.slide');
     var total = $slides.length;
     var current = 0;
     var busy = false;
     var timer = null;
+    var onScreen = true;
     var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var $dots = $('#slider-dots');
+    var dotsHtml = '';
 
     if (reduce) { $.fx.off = true; }
 
-    $slides.each(function (i) {
-      $('<button type="button">')
-        .attr('aria-label', 'Ke slide ' + (i + 1))
-        .toggleClass('active', i === 0)
-        .on('click', function () { go(i); restart(); })
-        .appendTo($dots);
-    });
+    for (var i = 0; i < total; i++) {
+      dotsHtml += '<button type="button" aria-label="Ke slide ' + (i + 1) + '"' + (i === 0 ? ' class="active"' : '') + '></button>';
+    }
+    $dots.html(dotsHtml).on('click', 'button', function () { go($(this).index()); restart(); });
 
     function go(index) {
       index = (index + total) % total;
@@ -455,8 +481,9 @@
       });
     }
 
+    // Jangan memutar slide kalau tab disembunyikan atau hero sudah keluar layar (hemat CPU & baterai).
     function start() {
-      if (reduce || timer) { return; }
+      if (reduce || timer || document.hidden || !onScreen) { return; }
       timer = window.setInterval(function () { go(current + 1); }, 5500);
     }
     function stop() { window.clearInterval(timer); timer = null; }
@@ -464,55 +491,77 @@
 
     $('#slider-prev').on('click', function () { go(current - 1); restart(); });
     $('#slider-next').on('click', function () { go(current + 1); restart(); });
-    $('.hero').on('mouseenter focusin', stop).on('mouseleave focusout', start);
+    $hero.on('mouseenter focusin', stop).on('mouseleave focusout', start);
+    document.addEventListener('visibilitychange', function () { if (document.hidden) { stop(); } else { start(); } });
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (entries) {
+        onScreen = entries[entries.length - 1].isIntersecting;
+        if (onScreen) { start(); } else { stop(); }
+      }).observe($hero[0]);
+    }
     start();
   }
 
   /* ---------- Menu mobile ---------- */
 
   function setNav(open) {
-    $('#site-header').toggleClass('nav-open', open);
-    $('#nav-toggle').attr('aria-expanded', open ? 'true' : 'false')
+    $ui.siteHeader.toggleClass('nav-open', open);
+    $ui.navToggle.attr('aria-expanded', open ? 'true' : 'false')
       .attr('aria-label', open ? 'Tutup menu' : 'Buka menu');
   }
 
   /* ---------- Pasang event ---------- */
 
   $(function () {
+    // Cache semua elemen yang dipakai berulang (#product-grid -> $ui.productGrid)
+    $.each(DOM_IDS, function (_, id) {
+      $ui[id.replace(/-(\w)/g, function (_m, c) { return c.toUpperCase(); })] = $('#' + id);
+    });
+    $.each(['nama', 'hp', 'alamat'], function (_, f) {
+      $fields[f] = { $in: $('#order-' + f), $err: $('#err-' + f) };
+    });
+
+    var $metode = $('input[name="metode"]');
+    var searchTimer = null;
+    var cartId = function (el) { return Number($(el).closest('.cart-item').attr('data-id')); };
+
     $('#year').text(new Date().getFullYear());
 
     initSlider();
     restoreUser();
     loadProducts();
-    loadUsers();
-    renderCart();
 
-    // Cari, urut
-    $('#search').on('input', function () { view.q = $(this).val(); renderProducts(); });
-    $('#sort').on('change', function () { view.sort = $(this).val(); renderProducts(); });
+    // Cari (ditunda 60 ms saat mengetik), urut
+    $ui.search.on('input', function () {
+      view.q = this.value;
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(renderProducts, 60);
+    });
+    $ui.sort.on('change', function () { view.sort = this.value; renderProducts(); });
 
     // Event delegation: elemen ini dibuat dinamis setelah JSON dimuat
-    $('#filter-kategori').on('click', '.chip', function () {
+    $ui.filterKategori.on('click', '.chip', function () {
       view.kategori = $(this).attr('data-kategori');
-      $('#filter-kategori .chip').removeClass('active').attr('aria-pressed', 'false');
+      $ui.filterKategori.children().removeClass('active').attr('aria-pressed', 'false');
       $(this).addClass('active').attr('aria-pressed', 'true');
       renderProducts();
     });
-    $('#product-grid').on('click', '.btn-add', function () {
+    $ui.productGrid.on('click', '.btn-add', function () {
       addToCart(Number($(this).attr('data-id')));
     });
-    $('#cart-items')
-      .on('click', '.qty-plus', function () { changeQty(Number($(this).closest('.cart-item').attr('data-id')), 1); })
-      .on('click', '.qty-minus', function () { changeQty(Number($(this).closest('.cart-item').attr('data-id')), -1); })
-      .on('click', '.cart-remove', function () { removeItem(Number($(this).closest('.cart-item').attr('data-id'))); });
+    $ui.cartItems
+      .on('click', '.qty-plus', function () { var id = cartId(this); changeQty(id, 1); refocusCart(id, '.qty-plus'); })
+      .on('click', '.qty-minus', function () { var id = cartId(this); changeQty(id, -1); refocusCart(id, '.qty-minus'); })
+      .on('click', '.cart-remove', function () { removeItem(cartId(this)); refocusCart(); });
 
     // Drawer & modal
-    $('#btn-cart').on('click', openDrawer);
+    $ui.btnCart.on('click', openDrawer);
     $('#cart-close, #overlay, #success-close').on('click', closeDrawer);
-    $('#btn-login, #note-login').on('click', openLogin);
+    $('#btn-login, #note-login').on('click', openLogin)
+      .one('mouseenter focus touchstart', getUsers);   // unduh users.json lebih awal begitu pengguna mendekati tombol
     $('#login-close').on('click', closeLogin);
-    $('#login-modal').on('click', function (e) { if (e.target === this) { closeLogin(); } });
-    $('#login-form').on('submit', onLoginSubmit);
+    $ui.loginModal.on('click', function (e) { if (e.target === this) { closeLogin(); } });
+    $ui.loginForm.on('submit', onLoginSubmit);
     $('#btn-logout').on('click', function () { setUser(null); toast('Anda sudah keluar.'); });
     $(document).on('keydown', function (e) {
       if (e.key !== 'Escape') { return; }
@@ -522,21 +571,20 @@
     });
 
     // Form pemesanan
-    $('#order-form').on('submit', onOrderSubmit);
-    $('input[name="metode"]').on('change', function () {
-      var antar = $('input[name="metode"]:checked').val() === 'antar';
-      if (antar) { $('#alamat-group').slideDown(200); }
-      else { $('#alamat-group').slideUp(200); setFieldError('alamat', ''); }
+    $ui.orderForm.on('submit', onOrderSubmit);
+    $metode.on('change', function () {
+      if ($metode.filter(':checked').val() === 'antar') { $ui.alamatGroup.slideDown(200); }
+      else { $ui.alamatGroup.slideUp(200); setFieldError('alamat', ''); }
     });
-    $('#order-nama, #order-hp, #order-alamat').on('input', function () {
+    $ui.orderForm.on('input', 'input, textarea', function () {
       var f = this.id.replace('order-', '');
-      if ($(this).hasClass('invalid')) { setFieldError(f, ''); }
+      if ($fields[f] && $(this).hasClass('invalid')) { setFieldError(f, ''); }
     });
 
-    // Menu mobile
-    $('#nav-toggle').on('click', function () { setNav(!$('#site-header').hasClass('nav-open')); });
+    // Menu mobile (matchMedia menggantikan listener resize yang terpanggil terus-menerus)
+    $ui.navToggle.on('click', function () { setNav(!$ui.siteHeader.hasClass('nav-open')); });
     $('#main-nav').on('click', 'a', function () { setNav(false); });
-    $(window).on('resize', function () { if (window.innerWidth > 768) { setNav(false); } });
+    window.matchMedia('(min-width: 769px)').addEventListener('change', function (e) { if (e.matches) { setNav(false); } });
   });
 
 })(jQuery);

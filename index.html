@@ -7,7 +7,12 @@
   <meta name="theme-color" content="#2E7D32">
   <title>Toko Buah Segar Blitar</title>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <!-- Mulai koneksi ke CDN dan unduh data produk lebih awal, tanpa menunggu skrip berjalan -->
+  <link rel="preconnect" href="https://code.jquery.com" crossorigin>
+  <link rel="preload" href="data/products.json" as="fetch" crossorigin>
   <link rel="stylesheet" href="styles.css">
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous" defer></script>
+  <script src="app.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#produk">Lewati ke produk</a>
@@ -196,12 +201,12 @@
       <div id="cart-view">
         <p class="state-msg" id="cart-empty">Keranjang masih kosong. Yuk pilih buah dulu.</p>
         <ul class="cart-list" id="cart-items"></ul>
-        <div class="cart-total" id="cart-total-row">
+        <div class="cart-total hidden" id="cart-total-row">
           <span>Total</span>
           <strong id="cart-total">Rp 0</strong>
         </div>
 
-        <form class="order-form" id="order-form" novalidate>
+        <form class="order-form hidden" id="order-form" novalidate>
           <h3>Data Pemesan</h3>
           <p class="login-note hidden" id="login-note">Silakan <button type="button" class="link-btn" id="note-login">masuk</button> terlebih dahulu untuk memesan.</p>
 
@@ -268,8 +273,5 @@
   </div>
 
   <div class="toast-wrap" id="toast-wrap" aria-live="polite"></div>
-
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-  <script src="app.js"></script>
 </body>
 </html>
